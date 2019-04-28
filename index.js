@@ -1,43 +1,46 @@
-var express = require('express'); 
-var app = express();
-var path = require('path');
-var gpio = require('rpi-gpio');
-
-gpio.setup(7, gpio.DIR_OUT);
-
+const express = require('express'); 
+const app = express();
+const path = require('path');
+const onoff = require('onoff');
+const cors = require('cors');
 
 
+app.use(cors());
 
-app.set('view engine', 'ejs');
+const Gpio = onoff.Gpio,
+  LED = new Gpio(17, 'out'), //#B
+  LED2 = new Gpio(18, 'out')
 
 app.use(express.static(path.join(__dirname, 'public')));
 
 console.log(path.join(__dirname, 'public'));
 
-app.get('/', function(req, res){ 
- 	res.render('index',{status:"Press Button To change Status of Led !!"});
+app.get('/', function(req, res){
+    if(req.query['place'] === 'sala'){
+        console.log('PLACE: ', req.query['place']);
+        let value = (LED.readSync() + 1) % 2;        
+        LED.writeSync(value);
+    }
+    if(req.query['place'] === 'quarto'){
+        console.log('PLACE: ', req.query['place']);
+        let value2 = (LED2.readSync() + 1) % 2;        
+        LED2.writeSync(value2);
+    }
+    
+    console.log('RES: ', req.query['state'])
+
+    res.send("Press Button To change Status of Led !!");
 });
 
-app.post('/led/on', function(req, res){
-gpio.write(7, true, function(err) {
-        if (err) throw err;
-        console.log('Written True to pin');
-	console.log(path.join(__dirname, 'public'));
-	return res.render('index', {status: "Cool!!Led is On"});
-    });
 
-});
+function unexportOnClose() { //function to run when exiting program
+  LED.writeSync(0); // Turn LED off
+  LED.unexport(); // Unexport LED GPIO to free resources
+  LED2.writeSync(0); // Turn LED2 off
+  LED2.unexport(); // Unexport LED2 GPIO to free resources
+};
 
-
-app.post('/led/off', function(req, res){
-gpio.write(7, false, function(err) {
-        if (err) throw err;
-        console.log('Written False to pin');
-	console.log(path.join(__dirname, 'public'));
-	return res.render('index',{status: "Ohh!! Led is Off"});
-    });
-
-});
+process.on('SIGINT', unexportOnClose); //function to run when user closes using ctrl+c
 
 
 app.listen(3000, function () {
